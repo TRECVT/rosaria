@@ -521,9 +521,9 @@ void RosAriaNode::publish()
   position.child_frame_id = frame_id_base_link;
   position.header.stamp = ros::Time::now();
 
-  if(position.twist.twist.linear.x == 0 && 
-    position.twist.twist.linear.y == 0 && 
-    position.twist.twist.angular.z ==0 )
+  if(position.twist.twist.linear.x  == 0 && 
+     position.twist.twist.linear.y  == 0 && 
+     position.twist.twist.angular.z == 0)
   {
     position.pose.covariance = ODOM_POSE_COVARIANCE_NM;
     position.twist.covariance = ODOM_TWIST_COVARIANCE_NM;

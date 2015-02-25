@@ -66,8 +66,6 @@ class RosAriaNode
   public:
     RosAriaNode(ros::NodeHandle n);
     virtual ~RosAriaNode();
-    
-
 
   public:
     int Setup();

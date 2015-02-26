@@ -25,6 +25,7 @@
 #include "std_msgs/Int8.h"
 #include "std_msgs/Bool.h"
 #include "std_srvs/Empty.h"
+#include <sensor_msgs/LaserScan.h>
 
 #include <sstream>
 
@@ -124,6 +125,13 @@ class RosAriaNode
     std::string frame_id_base_link;
     std::string frame_id_bumper;
     std::string frame_id_sonar;
+
+    // Sick S3 Laser driver for RosAria: lakid
+    ArLaserConnector *laserconn;
+    ArLaser* laser;
+    std::map<int, ArLaser*> *lasers;
+    bool laser_exists;
+    ros::Publisher laser_pub;
 
     // flag indicating whether sonar was enabled or disabled on the robot
     bool sonar_enabled; 
@@ -286,6 +294,7 @@ void RosAriaNode::sonarConnectCb()
 
 RosAriaNode::RosAriaNode(ros::NodeHandle nh) : 
   myPublishCB(this, &RosAriaNode::publish), serial_port(""), serial_baud(0),
+  laser_exists(false),
   sonar_enabled(false), publish_sonar(false), publish_sonar_pointcloud2(false)
 {
   // read in runtime parameters
@@ -340,6 +349,8 @@ RosAriaNode::RosAriaNode(ros::NodeHandle nh) :
   motors_state.data = false;
   published_motors_state = false;
   
+  laser_pub  = n.advertise<sensor_msgs::LaserScan>("scan",1000);
+
   // subscribe to services
   cmdvel_sub = n.subscribe( "cmd_vel", 1, (boost::function <void(const geometry_msgs::TwistConstPtr&)>)
     boost::bind(&RosAriaNode::cmdvel_cb, this, _1 ));
@@ -371,6 +382,8 @@ int RosAriaNode::Setup()
   ArArgumentBuilder *args = new ArArgumentBuilder(); //  never freed
   ArArgumentParser *argparser = new ArArgumentParser(args); // Warning never freed
   argparser->loadDefaultArguments(); // adds any arguments given in /etc/Aria.args.  Useful on robots with unusual serial port or baud rate (e.g. pioneer lx)
+
+  
 
   // Now add any parameters given via ros params (see RosAriaNode constructor):
 
@@ -413,6 +426,8 @@ int RosAriaNode::Setup()
 
   // Connect to the robot
   conn = new ArRobotConnector(argparser, robot); // warning never freed
+  laserconn = new ArLaserConnector(argparser, robot, conn);
+
   if (!conn->connectRobot()) {
     ROS_ERROR("RosAria: ARIA could not connect to robot! (Check ~port parameter is correct, and permissions on port device.)");
     return 1;
@@ -423,6 +438,11 @@ int RosAriaNode::Setup()
   {
     ROS_ERROR("RosAria: ARIA error parsing ARIA startup parameters!");
     return 1;
+  }
+
+    if(!laserconn->connectLasers())
+  {
+    ROS_ERROR("Could not connect to configured lasers. Not Publishing Lasers.");
   }
 
   readParameters();
@@ -483,6 +503,22 @@ int RosAriaNode::Setup()
   
   dynamic_reconfigure_server->setCallback(boost::bind(&RosAriaNode::dynamic_reconfigureCB, this, _1, _2));
 
+  //Find the working laser interface
+  lasers = robot->getLaserMap();
+
+  for(std::map<int, ArLaser*>::const_iterator i = lasers->begin(); i != lasers->end(); ++i)
+  {
+    int laserIndex = (*i).first;
+    laser = (*i).second;
+    if(!laser)
+      continue;
+    else
+    {
+      laser_exists = true;
+      break;
+    }
+  }
+
   // Enable the motors
   robot->enableMotors();
 
@@ -498,6 +534,7 @@ int RosAriaNode::Setup()
 
   // Run ArRobot background processing thread
   robot->runAsync(true);
+
 
   return 0;
 }
@@ -614,17 +651,51 @@ void RosAriaNode::publish()
   bool e = robot->areMotorsEnabled();
   if(e != motors_state.data || !published_motors_state)
   {
-	ROS_INFO("RosAria: publishing new motors state %d.", e);
-	motors_state.data = e;
-	motors_state_pub.publish(motors_state);
-	published_motors_state = true;
+    ROS_INFO("RosAria: publishing new motors state %d.", e);
+    motors_state.data = e;
+    motors_state_pub.publish(motors_state);
+    published_motors_state = true;
+  }
+
+  // Publish Laser scans
+  if (laser_exists)
+  {  
+
+    const std::list<ArSensorReading*> *readings;
+    ArSensorReading *reading;
+    std::list<ArSensorReading *>::const_iterator it;
+    sensor_msgs::LaserScan laser_msg;
+
+    laser->lockDevice();
+    readings = laser->getRawReadings();
+    laser->unlockDevice();
+
+    if (!readings->empty())
+    {
+      // Angle settings are only for Sick S3 LRF
+      // TODO: Make a generic version so it supports any laser scanner by getting the params below from
+      // the library instead of the datasheet.
+      laser_msg.header.stamp = ros::Time::now();
+      laser_msg.header.frame_id = "laser";
+      laser_msg.angle_min = -3*M_PI/4;
+      laser_msg.angle_max = 3*M_PI/4;
+      laser_msg.angle_increment = 3*M_PI/(2*540);
+      laser_msg.range_min = 0.0;
+      laser_msg.range_max = 30.0;
+      for (it = readings->begin(); it != readings->end(); it++)
+      {
+        reading = (*it);
+        laser_msg.ranges.push_back(reading->getRange()/1000.0);
+      }
+      laser_pub.publish(laser_msg);
+    }
   }
 
   // Publish sonar information, if enabled.
   if (publish_sonar || publish_sonar_pointcloud2)
   {
-    sensor_msgs::PointCloud cloud;	//sonar readings.
-    cloud.header.stamp = position.header.stamp;	//copy time.
+    sensor_msgs::PointCloud cloud;  //sonar readings.
+    cloud.header.stamp = position.header.stamp; //copy time.
     // sonar sensors relative to base_link
     cloud.header.frame_id = frame_id_sonar;
   
@@ -693,7 +764,7 @@ bool RosAriaNode::enable_motors_cb(std_srvs::Empty::Request& request, std_srvs::
         ROS_WARN("RosAria: Warning: Enable motors requested, but robot also has E-Stop button pressed. Motors will not enable.");
     robot->enableMotors();
     robot->unlock();
-	// todo could wait and see if motors do become enabled, and send a response with an error flag if not
+  // todo could wait and see if motors do become enabled, and send a response with an error flag if not
     return true;
 }
 
@@ -703,7 +774,7 @@ bool RosAriaNode::disable_motors_cb(std_srvs::Empty::Request& request, std_srvs:
     robot->lock();
     robot->disableMotors();
     robot->unlock();
-	// todo could wait and see if motors do become disabled, and send a response with an error flag if not
+  // todo could wait and see if motors do become disabled, and send a response with an error flag if not
     return true;
 }
 

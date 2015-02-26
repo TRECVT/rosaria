@@ -116,8 +116,6 @@ class RosAriaNode
     ArFunctorC<RosAriaNode> myPublishCB;
     //ArRobot::ChargeState batteryCharge;
 
-
-
     //for odom->base_link transform
     tf::TransformBroadcaster odom_broadcaster;
     geometry_msgs::TransformStamped odom_trans;
@@ -675,18 +673,20 @@ void RosAriaNode::publish()
     if (!readings->empty())
     {
       // Angle settings are only for Sick S3 LRF
+      // TODO: Make a generic version so it supports any laser scanner by getting the params below from
+      // the library instead of the datasheet.
       laser_msg.header.stamp = ros::Time::now();
       laser_msg.header.frame_id = "laser";
       laser_msg.angle_min = -3*M_PI/4;
       laser_msg.angle_max = 3*M_PI/4;
       laser_msg.angle_increment = 3*M_PI/(2*540);
-      laser_msg.range_max = 80.0;
+      laser_msg.range_min = 0.0;
+      laser_msg.range_max = 30.0;
       for (it = readings->begin(); it != readings->end(); it++)
       {
         reading = (*it);
         laser_msg.ranges.push_back(reading->getRange()/1000.0);
       }
-      //ROS_INFO("Number of scans: %d", laser_msg.ranges.size());
       laser_pub.publish(laser_msg);
     }
   }

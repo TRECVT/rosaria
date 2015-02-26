@@ -128,9 +128,8 @@ class RosAriaNode
     std::string frame_id_bumper;
     std::string frame_id_sonar;
 
-    // Laser driver for RosAria: lakid
+    // Sick S3 Laser driver for RosAria: lakid
     ArLaserConnector *laserconn;
-    sensor_msgs::LaserScan laser_msg;
     ArLaser* laser;
     std::map<int, ArLaser*> *lasers;
     bool laser_exists;
@@ -654,19 +653,20 @@ void RosAriaNode::publish()
   bool e = robot->areMotorsEnabled();
   if(e != motors_state.data || !published_motors_state)
   {
-	ROS_INFO("RosAria: publishing new motors state %d.", e);
-	motors_state.data = e;
-	motors_state_pub.publish(motors_state);
-	published_motors_state = true;
+  ROS_INFO("RosAria: publishing new motors state %d.", e);
+  motors_state.data = e;
+  motors_state_pub.publish(motors_state);
+  published_motors_state = true;
   }
 
   // Publish Laser scans
   if (laser_exists)
   {  
-
+    
     const std::list<ArSensorReading*> *readings;
     ArSensorReading *reading;
     std::list<ArSensorReading *>::const_iterator it;
+    sensor_msgs::LaserScan laser_msg;
 
     laser->lockDevice();
     readings = laser->getRawReadings();
@@ -674,17 +674,19 @@ void RosAriaNode::publish()
 
     if (!readings->empty())
     {
-
+      // Angle settings are only for Sick S3 LRF
       laser_msg.header.stamp = ros::Time::now();
       laser_msg.header.frame_id = "laser";
-
+      laser_msg.angle_min = -3*M_PI/4;
+      laser_msg.angle_max = 3*M_PI/4;
+      laser_msg.angle_increment = 3*M_PI/(2*540);
+      laser_msg.range_max = 80.0;
       for (it = readings->begin(); it != readings->end(); it++)
       {
         reading = (*it);
         laser_msg.ranges.push_back(reading->getRange()/1000.0);
-      //  fprintf(myFile, "%f, ", reading->getRange()/1000.0);
       }
-
+      //ROS_INFO("Number of scans: %d", laser_msg.ranges.size());
       laser_pub.publish(laser_msg);
     }
   }
@@ -692,8 +694,8 @@ void RosAriaNode::publish()
   // Publish sonar information, if enabled.
   if (publish_sonar || publish_sonar_pointcloud2)
   {
-    sensor_msgs::PointCloud cloud;	//sonar readings.
-    cloud.header.stamp = position.header.stamp;	//copy time.
+    sensor_msgs::PointCloud cloud;  //sonar readings.
+    cloud.header.stamp = position.header.stamp; //copy time.
     // sonar sensors relative to base_link
     cloud.header.frame_id = frame_id_sonar;
   
@@ -762,7 +764,7 @@ bool RosAriaNode::enable_motors_cb(std_srvs::Empty::Request& request, std_srvs::
         ROS_WARN("RosAria: Warning: Enable motors requested, but robot also has E-Stop button pressed. Motors will not enable.");
     robot->enableMotors();
     robot->unlock();
-	// todo could wait and see if motors do become enabled, and send a response with an error flag if not
+  // todo could wait and see if motors do become enabled, and send a response with an error flag if not
     return true;
 }
 
@@ -772,7 +774,7 @@ bool RosAriaNode::disable_motors_cb(std_srvs::Empty::Request& request, std_srvs:
     robot->lock();
     robot->disableMotors();
     robot->unlock();
-	// todo could wait and see if motors do become disabled, and send a response with an error flag if not
+  // todo could wait and see if motors do become disabled, and send a response with an error flag if not
     return true;
 }
 

@@ -653,16 +653,16 @@ void RosAriaNode::publish()
   bool e = robot->areMotorsEnabled();
   if(e != motors_state.data || !published_motors_state)
   {
-  ROS_INFO("RosAria: publishing new motors state %d.", e);
-  motors_state.data = e;
-  motors_state_pub.publish(motors_state);
-  published_motors_state = true;
+    ROS_INFO("RosAria: publishing new motors state %d.", e);
+    motors_state.data = e;
+    motors_state_pub.publish(motors_state);
+    published_motors_state = true;
   }
 
   // Publish Laser scans
   if (laser_exists)
   {  
-    
+
     const std::list<ArSensorReading*> *readings;
     ArSensorReading *reading;
     std::list<ArSensorReading *>::const_iterator it;

@@ -1,9 +1,9 @@
 <!-- -->
 <launch>
-	<machine name="tobor" address="tobor" env-loader="/home/rene/.bashrc" user="rene"/>
+	<machine name="sonny" address="sonny" env-loader="/home/rene/.bashrc" user="rene"/>
 
 	<!-- Launches RosAria using default parameters found in /ets/Aria.conf -->
-	<node machine="tobor" name="RosAria" pkg="rosaria" type="RosAria" output="screen"/>
+	<node machine="sonny" name="RosAria" pkg="rosaria" type="RosAria" output="screen"/>
 
 </launch>
 

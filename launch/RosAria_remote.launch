@@ -5,5 +5,7 @@
 	<!-- Launches RosAria using default parameters found in /ets/Aria.conf -->
 	<node machine="sonny" name="RosAria" pkg="rosaria" type="RosAria" output="screen"/>
 
+        <node pkg="tf" type="static_transform_publisher" name="pioneer_laser_transfrom" args="0.300 0 0.1887 0 0 0 1 rolling_base laser 10" />
+
 </launch>
 

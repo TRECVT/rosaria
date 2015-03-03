@@ -1,6 +1,7 @@
 <!-- -->
 
 <launch>
+	
 	<!-- Launches RosAria using default parameters found in /ets/Aria.conf -->
 	<node name="RosAria" pkg="rosaria" type="RosAria" output="screen"/>
 

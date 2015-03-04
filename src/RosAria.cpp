@@ -676,7 +676,7 @@ void RosAriaNode::publish()
       // TODO: Make a generic version so it supports any laser scanner by getting the params below from
       // the library instead of the datasheet.
       laser_msg.header.stamp = ros::Time::now();
-      laser_msg.header.frame_id = "laser";
+      laser_msg.header.frame_id = "base_laser";
       laser_msg.angle_min = -3*M_PI/4;
       laser_msg.angle_max = 3*M_PI/4;
       laser_msg.angle_increment = 3*M_PI/(2*540);

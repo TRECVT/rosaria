@@ -2,8 +2,8 @@
 
 -->
 <launch>
-	<machine name="sonny" address="sonny" env-loader="/home/rene/.bashrc" user="rene"/>
-
+	<machine name="sonny" address="sonny" env-loader="/home/thor/remote_launch.sh" user="thor"/>
+<!-- env-loader="/home/thor/remote_launch.sh" -->
 	<!-- Launches RosAria using default parameters found in /ets/Aria.conf -->
 	<node machine="sonny" name="RosAria" pkg="rosaria" type="RosAria" output="screen"/>
 </launch>
